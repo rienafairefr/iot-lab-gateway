@@ -1,1 +1,8 @@
 docker/
+.git
+.tox
+control_node_serial/control_node_serial_interface
+cover/
+*.egg-info
+coverage.xml
+nosetests.xml
