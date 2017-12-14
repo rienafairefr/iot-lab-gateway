@@ -1,6 +1,3 @@
-FROM ubuntu:14.04
-LABEL maintainer Matthieu Berthomé <matthieu.berthome@inria.fr>
-
 # This file is a part of IoT-LAB gateway_code
 # Copyright (C) 2015 INRIA (Contact: admin@iot-lab.info)
 # Contributor(s) : see AUTHORS file
@@ -20,71 +17,28 @@ LABEL maintainer Matthieu Berthomé <matthieu.berthome@inria.fr>
 # The fact that you are presently reading this means that you have had
 # knowledge of the CeCILL license and that you accept its terms.
 
-#MANDATORY
-RUN apt-get update && \
-    apt-get install -y git \
-        python-dev \
-        python-setuptools \
-        socat && \
-    apt-get clean
+FROM ubuntu:14.04 as openocd
 
 #openocd
 RUN apt-get update && \
     apt-get install -y \
+        git \
         build-essential \
         libftdi-dev \
         libhidapi-dev \
         libusb-1.0-0-dev \
         autoconf \
-        libsqlite3-dev \
         libpopt-dev \
-        libxml2-dev \
-        ruby \
         libtool \
         pkg-config && \
     apt-get clean
-
-#AVR (arduino like)
-RUN apt-get update && \
-    apt-get install -y \
-        avrdude && \
-    apt-get clean
-
-#To do http requests (to upload an experiment for instance)
-RUN apt-get update && \
-    apt-get install -y \
-        curl && \
-    apt-get clean
-
-#Making a work directory to setup the gateway
-RUN mkdir /setup_dir
-WORKDIR /setup_dir
-
-#liboml2 install
-RUN mkdir /var/www && chown www-data:www-data /var/www
-
-RUN apt-get update && \
-    apt-get install -y \
-        autoconf automake libtool gnulib libpopt-dev \
-        libxml2 libsqlite3-dev pkg-config libxml2-utils && \
-    apt-get clean
-
-RUN git clone https://github.com/mytestbed/oml.git && \
-    cd oml && \
-    git checkout tags/v2.11.0 && \
-    ./autogen.sh && \
-    ./configure --disable-doc --disable-doxygen-doc --disable-doxygen-dot \ 
-        --disable-android --disable-doxygen-html --disable-option-checking && \
-    make && \
-    sudo make install && \
-    cd .. && rm -rf oml
 
 #openocd install (for M3 and SAMR21)
 RUN git clone https://github.com/ntfreak/openocd && \
     cd openocd && \
     git checkout v0.9.0 && \
     ./bootstrap && \
-    ./configure  --enable-legacy-ft2232_libftdi --disable-ftdi2232 \
+    ./configure --prefix=/opt/openocd --enable-legacy-ft2232_libftdi --disable-ftdi2232 \
         --disable-ftd2xx --enable-cmsis-dap --enable-hidapi-libusb && \
     make && \
     sudo make install && \
@@ -100,14 +54,88 @@ RUN git clone https://github.com/ntfreak/openocd openocd10 && \
     sudo make install && \
     cd .. && rm -rf openocd10
 
-#iot-lab-ftdi-utils install
+FROM ubuntu:14.04 as liboml2
 
-#(for M3 Nodes and Hikob IoT-LAB Gateway)
+RUN apt-get update && \
+    apt-get install -y \
+        ruby \
+        git \
+        python \
+        check \
+        autoconf \
+        automake \
+        libtool \
+        gnulib \
+        libpopt-dev \
+        libxml2 \
+        libxml2-dev \
+        libsqlite3-dev \
+        pkg-config \
+        libxml2-utils && \
+    apt-get clean
+
+RUN git clone https://github.com/mytestbed/oml.git && \
+    cd oml && \
+    git checkout tags/v2.11.0 && \
+    ./autogen.sh && \
+    ./configure --prefix=/opt/oml --disable-doc --disable-doxygen-doc --disable-doxygen-dot \
+        --disable-android --disable-doxygen-html --disable-option-checking && \
+    make && \
+    make install && \
+    cd .. && \
+    rm -rf oml
+
+FROM ubuntu:14.04 as iot-lab-ftdi-utils
+
+RUN apt-get update && \
+    apt-get install -y \
+        git \
+        build-essential \
+        libftdi-dev \
+        libhidapi-dev \
+        libusb-1.0-0-dev \
+        autoconf \
+        libpopt-dev \
+        libtool \
+        pkg-config && \
+    apt-get clean
+
+#iot-lab-ftdi-utils install
 RUN git clone https://github.com/iot-lab/iot-lab-ftdi-utils/  && \
     cd iot-lab-ftdi-utils && \
     make && \
     make install && \
-    cd .. && rm -rf iot-lab-ftdi-utils
+    cd .. && \
+    rm -rf iot-lab-ftdi-utils
+
+# the actual image
+FROM ubuntu:14.04
+LABEL maintainer="Matthieu Berthomé <matthieu.berthome@inria.fr>"
+
+#AVR (arduino like)
+RUN apt-get update && \
+    apt-get install -y \
+        avrdude && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN apt-get update && \
+    apt-get install -y \
+        git \
+        build-essential \
+        python \
+        socat \
+        libxml2-dev \
+        libftdi-dev \
+        libhidapi-dev \
+        libusb-1.0-0-dev \
+        autoconf \
+        libpopt-dev \
+        libtool \
+        pkg-config \
+        ruby && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # cc2538 for firefly
 RUN git clone https://github.com/JelmerT/cc2538-bsl && \
@@ -116,22 +144,10 @@ RUN git clone https://github.com/JelmerT/cc2538-bsl && \
     apt-get install -y python-pip binutils && \
     pip install intelhex
 
-#for all
+# copy from the builders
+COPY --from=openocd /opt/openocd /usr/local/
+COPY --from=openocd /opt/openocd-0.10.0 /opt/openocd-0.10.0
+COPY --from=iot-lab-ftdi-utils /usr/local/bin/ftdi* /usr/local/bin/
+COPY --from=liboml2 /opt/oml/ /usr/local/
 
-RUN rm -rf /setup_dir
-
-WORKDIR /home
-
-RUN mkdir iot-lab-gateway
-COPY . /home/iot-lab-gateway/
-RUN cd iot-lab-gateway && \
-    python setup.py develop
-
-#test with M3 config
-RUN mkdir -p /var/local/config/ && \
-    mkdir -p /iotlab/users/test && \
-    chown www-data:www-data /iotlab/users/test
-
-WORKDIR /home/iot-lab-gateway
-
-CMD ["/home/iot-lab-gateway/docker-gateway-rest-server"]
+WORKDIR /iot-lab-gateway

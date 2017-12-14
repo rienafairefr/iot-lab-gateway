@@ -64,7 +64,7 @@ class OpenOCD(object):
     TIMEOUT = 100
 
     def __init__(self, openocd_args,
-                 verb=False, timeout=TIMEOUT):
+                 verb=True, timeout=TIMEOUT):
         self.openocd_path = openocd_args.path
         self.config = self._config(openocd_args.config_file, openocd_args.opts)
         self.timeout = timeout
