@@ -1,5 +1,5 @@
 FROM ubuntu:14.04
-MAINTAINER Cédric Roussel <cedric.roussel@inria.fr>
+LABEL maintainer Matthieu Berthomé <matthieu.berthome@inria.fr>
 
 # This file is a part of IoT-LAB gateway_code
 # Copyright (C) 2015 INRIA (Contact: admin@iot-lab.info)
